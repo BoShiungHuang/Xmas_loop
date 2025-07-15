@@ -1,0 +1,170 @@
+//@version=5
+strategy("ICT MMS Strategy", shorttitle="ICT MMS", overlay=true)
+
+// Strategy Settings
+var table infoTable = table.new(position.top_right, 4, 10, bgcolor=tableHeaderBg, border_width=1)
+
+// Input parameters
+length = input.int(20, "Period Length", minval=1)
+multiplier = input.float(2.0, "Multiplier", minval=0.1, step=0.1)
+useTable = input.bool(true, "Show Info Table")
+
+// Market Structure Variables
+var float lastHigh = na
+var float lastLow = na
+var int lastHighBar = na
+var int lastLowBar = na
+
+// Color definitions - Centralized and organized
+bullColor = color.new(color.green, 0)
+bearColor = color.new(color.red, 0)
+neutralColor = color.new(color.gray, 0)
+tableHeaderBg = color.new(color.white, 0)
+tableHeaderText = color.new(color.black, 0)
+tableCellText = color.new(color.white, 0)
+
+// Legacy color variables for compatibility
+bullColor = bullColor
+bearColor = bearColor
+neutralColor = neutralColor
+
+// Price calculations
+src = close
+upperBand = ta.sma(src, length) + multiplier * ta.stdev(src, length)
+lowerBand = ta.sma(src, length) - multiplier * ta.stdev(src, length)
+basis = ta.sma(src, length)
+
+// Market structure detection
+isNewHigh = high > ta.highest(high[1], length)
+isNewLow = low < ta.lowest(low[1], length)
+
+if isNewHigh
+    lastHigh := high
+    lastHighBar := bar_index
+
+if isNewLow
+    lastLow := low
+    lastLowBar := bar_index
+
+// Trend determination
+trend = close > basis ? 1 : close < basis ? -1 : 0
+
+// Entry conditions
+longCondition = close > upperBand and trend == 1
+shortCondition = close < lowerBand and trend == -1
+
+// Strategy entries
+if longCondition
+    strategy.entry("Long", strategy.long)
+
+if shortCondition
+    strategy.entry("Short", strategy.short)
+
+// Exit conditions
+if close < basis
+    strategy.close("Long")
+
+if close > basis
+    strategy.close("Short")
+
+// Plotting
+plot(upperBand, color=bullColor, title="Upper Band")
+plot(lowerBand, color=bearColor, title="Lower Band")
+plot(basis, color=neutralColor, title="Basis")
+
+// Signals
+plotshape(longCondition, style=shape.triangleup, location=location.belowbar, color=bullColor, size=size.small)
+plotshape(shortCondition, style=shape.triangledown, location=location.abovebar, color=bearColor, size=size.small)
+
+// Table display with improved color logic
+if useTable and barstate.islast
+    // Header row with consistent colors
+    table.cell(infoTable, 0, 0, "Market Structure", text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    table.cell(infoTable, 1, 0, "Current Trend", text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    table.cell(infoTable, 2, 0, "Last High", text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    table.cell(infoTable, 3, 0, "Last Low", text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    
+    table.cell(infoTable, 0, 1, "ICT MMS", text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    
+    // Trend display with simplified color logic
+    trendText = trend == 1 ? "Bullish" : trend == -1 ? "Bearish" : "Neutral"
+    trendBgColor = trend == 1 ? bullColor : trend == -1 ? bearColor : neutralColor
+    table.cell(infoTable, 1, 1, trendText, text_color=tableCellText, bgcolor=trendBgColor)
+    
+    // High/Low display
+    table.cell(infoTable, 2, 1, str.tostring(lastHigh, "#.####"), text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    table.cell(infoTable, 3, 1, str.tostring(lastLow, "#.####"), text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    
+    // Position info
+    table.cell(infoTable, 0, 2, "Position", text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    positionSize = strategy.position_size
+    positionText = positionSize > 0 ? "Long" : positionSize < 0 ? "Short" : "Flat"
+    positionBgColor = positionSize > 0 ? bullColor : positionSize < 0 ? bearColor : neutralColor
+    table.cell(infoTable, 1, 2, positionText, text_color=tableCellText, bgcolor=positionBgColor)
+    
+    // P&L Display
+    table.cell(infoTable, 2, 2, "P&L", text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    pnl = strategy.netprofit
+    pnlText = str.tostring(pnl, "#.##")
+    pnlBgColor = pnl > 0 ? bullColor : pnl < 0 ? bearColor : neutralColor
+    table.cell(infoTable, 3, 2, pnlText, text_color=tableCellText, bgcolor=pnlBgColor)
+    
+    // Win Rate
+    table.cell(infoTable, 0, 3, "Win Rate", text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    winRate = strategy.wintrades > 0 ? strategy.wintrades / (strategy.wintrades + strategy.losstrades) * 100 : 0
+    winRateText = str.tostring(winRate, "#.#") + "%"
+    winRateBgColor = winRate >= 50 ? bullColor : bearColor
+    table.cell(infoTable, 1, 3, winRateText, text_color=tableCellText, bgcolor=winRateBgColor)
+    
+    // Market State
+    table.cell(infoTable, 2, 3, "Market State", text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    marketState = close > upperBand ? "Overbought" : close < lowerBand ? "Oversold" : "Normal"
+    marketStateBgColor = close > upperBand ? bearColor : close < lowerBand ? bullColor : neutralColor
+    table.cell(infoTable, 3, 3, marketState, text_color=tableCellText, bgcolor=marketStateBgColor)
+    
+    // Volume analysis
+    table.cell(infoTable, 0, 4, "Volume", text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    avgVolume = ta.sma(volume, 20)
+    volumeState = volume > avgVolume ? "High" : "Low"
+    volumeBgColor = volume > avgVolume ? bullColor : bearColor
+    table.cell(infoTable, 1, 4, volumeState, text_color=tableCellText, bgcolor=volumeBgColor)
+    
+    // Price action
+    table.cell(infoTable, 2, 4, "Price Action", text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    priceAction = close > open ? "Bullish" : "Bearish"
+    priceActionBgColor = close > open ? bullColor : bearColor
+    table.cell(infoTable, 3, 4, priceAction, text_color=tableCellText, bgcolor=priceActionBgColor)
+    
+    // Support/Resistance levels
+    table.cell(infoTable, 0, 5, "Support", text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    table.cell(infoTable, 1, 5, str.tostring(lowerBand, "#.####"), text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    table.cell(infoTable, 2, 5, "Resistance", text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    table.cell(infoTable, 3, 5, str.tostring(upperBand, "#.####"), text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    
+    // Signal strength
+    table.cell(infoTable, 0, 6, "Signal", text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    signalStrength = longCondition ? "Strong Long" : shortCondition ? "Strong Short" : "No Signal"
+    signalBgColor = longCondition ? bullColor : shortCondition ? bearColor : neutralColor
+    table.cell(infoTable, 1, 6, signalStrength, text_color=tableCellText, bgcolor=signalBgColor)
+    
+    // Time frame
+    table.cell(infoTable, 2, 6, "Timeframe", text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    table.cell(infoTable, 3, 6, timeframe.period, text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    
+    // Additional metrics
+    table.cell(infoTable, 0, 7, "Total Trades", text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    totalTrades = strategy.closedtrades
+    table.cell(infoTable, 1, 7, str.tostring(totalTrades), text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    
+    table.cell(infoTable, 2, 7, "Max DD", text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    maxDD = strategy.max_drawdown
+    maxDDText = str.tostring(maxDD, "#.##")
+    table.cell(infoTable, 3, 7, maxDDText, text_color=tableCellText, bgcolor=bearColor)
+    
+    // Line 216 - Fixed color error
+    table.cell(infoTable, 0, 8, "Status", text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    
+    // More table cells that would follow
+    table.cell(infoTable, 1, 8, "Active", text_color=tableCellText, bgcolor=bullColor)
+    table.cell(infoTable, 2, 8, "Version", text_color=tableHeaderText, bgcolor=tableHeaderBg)
+    table.cell(infoTable, 3, 8, "1.0", text_color=tableHeaderText, bgcolor=tableHeaderBg)

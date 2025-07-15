@@ -1,0 +1,26 @@
+# Xcode
+*.xcuserdata
+*.xcuserdatad
+build/
+DerivedData/
+*.hmap
+*.ipa
+
+# macOS
+.DS_Store
+
+# Temporary files
+/tmp/
+*.tmp
+*.temp
+
+# IDE files
+.vscode/
+.idea/
+
+# Pine Script backup files
+*.pine.backup
+*.pine~
+
+# Log files
+*.log
